@@ -1,9 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
-const { Pool } = require('pg');
-
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-});
+const { levelStorage } = require('../../utils/jsonStorage');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -31,11 +27,8 @@ module.exports = {
                 });
             }
 
-            // Actualizar o insertar la configuración en la base de datos
-            await pool.query(
-                'INSERT INTO level_channels (guild_id, channel_id) VALUES ($1, $2) ON CONFLICT (guild_id) DO UPDATE SET channel_id = $2',
-                [guildId, channel.id]
-            );
+            // Actualizar configuración
+            await levelStorage.setLevelChannel(guildId, channel.id);
 
             await interaction.reply({
                 content: `✅ Canal de niveles configurado en ${channel}.\nLas notificaciones de subida de nivel se mostrarán en este canal.`,

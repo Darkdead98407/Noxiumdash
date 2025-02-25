@@ -3,13 +3,8 @@ const session = require('express-session');
 const passport = require('passport');
 const { Strategy } = require('passport-discord');
 const path = require('path');
-const { Pool } = require('pg');
 const config = require('../../config.json');
-
-// Configuración de la conexión a la base de datos
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-});
+const { sessionStorage } = require('../utils/jsonStorage');
 
 // Configuración de Passport Discord
 passport.serializeUser((user, done) => done(null, user));
@@ -35,6 +30,34 @@ const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// Store personalizado para sesiones en archivo JSON
+const JsonStore = {
+    get: async function(sid, callback) {
+        try {
+            const session = await sessionStorage.getSession(sid);
+            callback(null, session);
+        } catch (err) {
+            callback(err);
+        }
+    },
+    set: async function(sid, session, callback) {
+        try {
+            await sessionStorage.setSession(sid, session);
+            callback();
+        } catch (err) {
+            callback(err);
+        }
+    },
+    destroy: async function(sid, callback) {
+        try {
+            await sessionStorage.deleteSession(sid);
+            callback();
+        } catch (err) {
+            callback(err);
+        }
+    }
+};
+
 // Configuración de sesiones
 app.use(session({
     secret: config.clientSecret,
@@ -43,19 +66,11 @@ app.use(session({
     cookie: {
         maxAge: 60000 * 60 * 24 // 24 horas
     },
-    store: new (require('connect-pg-simple')(session))({
-        pool,
-        tableName: 'sessions'
-    })
+    store: JsonStore
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
-
-// Ruta de prueba
-app.get('/test', (req, res) => {
-    res.send('Dashboard funcionando correctamente');
-});
 
 // Middleware de autenticación
 function isAuthenticated(req, res, next) {
@@ -73,7 +88,6 @@ app.get('/', (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-    // Guardar la URL base en la sesión
     req.session.returnTo = BASE_URL;
     passport.authenticate('discord')(req, res);
 });
@@ -81,8 +95,6 @@ app.get('/login', (req, res) => {
 app.get('/auth/discord/callback', 
     (req, res, next) => {
         console.log('Recibida solicitud de callback:', req.url);
-        console.log('Headers:', req.headers);
-        console.log('Query:', req.query);
         next();
     },
     passport.authenticate('discord', { 

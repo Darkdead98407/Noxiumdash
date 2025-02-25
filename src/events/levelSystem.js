@@ -1,10 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
-const { Pool } = require('pg');
+const { levelStorage } = require('../utils/jsonStorage');
 const cacheUtils = require('../utils/cache');
-
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-});
 
 // Función para calcular el XP por mensaje según el nivel
 function getXPPerMessage(level) {
@@ -30,22 +26,8 @@ module.exports = {
 
             // Intentar obtener datos del caché primero
             const userData = await cacheUtils.getOrSet('levels', cacheKey, async () => {
-                const result = await pool.query(
-                    'SELECT * FROM user_levels WHERE user_id = $1 AND guild_id = $2',
-                    [message.author.id, message.guild.id]
-                );
-                return result.rows[0] || null;
+                return await levelStorage.getUserLevel(message.author.id, message.guild.id);
             });
-
-            if (!userData) {
-                // Crear nuevo registro para el usuario
-                await pool.query(
-                    'INSERT INTO user_levels (user_id, guild_id, xp, level, last_message_timestamp) VALUES ($1, $2, $3, $4, $5)',
-                    [message.author.id, message.guild.id, 0, 0, now]
-                );
-                cacheUtils.invalidate('levels', cacheKey);
-                return;
-            }
 
             const lastMessage = userData.last_message_timestamp ? new Date(userData.last_message_timestamp) : new Date(0);
             if (now - lastMessage >= XP_COOLDOWN) {
@@ -57,15 +39,6 @@ module.exports = {
                 const xpNeeded = nextLevelXP - currentLevelXP;
                 const xpGain = Math.floor((xpNeeded * xpGainPercentage) / 100);
 
-                console.log(`[DEBUG] Usuario: ${message.author.tag}`);
-                console.log(`[DEBUG] Nivel actual: ${currentLevel}`);
-                console.log(`[DEBUG] XP actual: ${userData.xp}`);
-                console.log(`[DEBUG] XP ganado: ${xpGain}`);
-                console.log(`[DEBUG] XP para siguiente nivel: ${nextLevelXP}`);
-                console.log(`[DEBUG] XP nivel actual: ${currentLevelXP}`);
-                console.log(`[DEBUG] XP necesario: ${xpNeeded}`);
-                console.log(`[DEBUG] Porcentaje de ganancia: ${xpGainPercentage}%`);
-
                 // Actualizar XP
                 const newXP = userData.xp + xpGain;
                 let newLevel = currentLevel;
@@ -76,11 +49,7 @@ module.exports = {
 
                     // Obtener el canal configurado para las notificaciones de nivel
                     const channelId = await cacheUtils.getOrSet('channels', `level_${message.guild.id}`, async () => {
-                        const result = await pool.query(
-                            'SELECT channel_id FROM level_channels WHERE guild_id = $1',
-                            [message.guild.id]
-                        );
-                        return result.rows[0]?.channel_id;
+                        return await levelStorage.getLevelChannel(message.guild.id);
                     });
 
                     // Crear mensaje de felicitación
@@ -100,17 +69,14 @@ module.exports = {
                     }
                 }
 
-                console.log(`[DEBUG] Nuevo XP: ${newXP}`);
-                console.log(`[DEBUG] Nuevo nivel: ${newLevel}`);
-                console.log(`[DEBUG] Progreso al siguiente nivel: ${((newXP - XP_FOR_LEVEL(newLevel)) / (XP_FOR_LEVEL(newLevel + 1) - XP_FOR_LEVEL(newLevel)) * 100)}%`);
+                // Actualizar datos del usuario
+                const updatedUserData = {
+                    xp: newXP,
+                    level: newLevel,
+                    last_message_timestamp: now
+                };
 
-                // Actualizar base de datos
-                await pool.query(
-                    'UPDATE user_levels SET xp = $1, level = $2, last_message_timestamp = $3 WHERE user_id = $4 AND guild_id = $5',
-                    [newXP, newLevel, now, message.author.id, message.guild.id]
-                );
-
-                // Invalidar caché para este usuario
+                await levelStorage.updateUserLevel(message.author.id, message.guild.id, updatedUserData);
                 cacheUtils.invalidate('levels', cacheKey);
             }
         } catch (error) {
