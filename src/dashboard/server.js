@@ -4,6 +4,7 @@ const passport = require('passport');
 const { Strategy } = require('passport-discord');
 const path = require('path');
 const { Pool } = require('pg');
+const config = require('../../config.json');
 
 // Configuración de la conexión a la base de datos
 const pool = new Pool({
@@ -17,8 +18,8 @@ passport.deserializeUser((user, done) => done(null, user));
 const BASE_URL = 'https://fbad2891-5a9d-421d-91d4-7e74da25f5d7-00-3hllxemm25m5u.kirk.replit.dev';
 
 const strategy = new Strategy({
-    clientID: process.env.BOT_CLIENT_ID,
-    clientSecret: process.env.DISCORD_CLIENT_SECRET,
+    clientID: config.clientId,
+    clientSecret: config.clientSecret,
     callbackURL: `${BASE_URL}/auth/discord/callback`,
     scope: ['identify', 'guilds']
 }, (accessToken, refreshToken, profile, done) => {
@@ -36,7 +37,7 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Configuración de sesiones
 app.use(session({
-    secret: process.env.DISCORD_CLIENT_SECRET,
+    secret: config.clientSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -92,7 +93,7 @@ app.get('/auth/discord/callback',
         console.log('Autenticación completada para:', req.user.username);
         const returnTo = req.session.returnTo || '/';
         delete req.session.returnTo;
-        res.redirect(returnTo); // Redirect to the stored URL or default to /
+        res.redirect(returnTo);
     }
 );
 
