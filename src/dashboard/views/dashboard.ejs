@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Panel de Control</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-indigo-600 text-white p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Panel de Control</h1>
+            <div class="flex items-center">
+                <span class="mr-4">Bienvenido, <%= user.username %></span>
+                <a href="/logout" class="px-4 py-2 bg-red-500 rounded hover:bg-red-700">Cerrar Sesión</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto mt-8 p-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <% if (botGuilds && botGuilds.length > 0) { %>
+                <% botGuilds.forEach(guild => { %>
+                    <div class="bg-white rounded-lg shadow-lg p-6">
+                        <div class="flex items-center mb-4">
+                            <% if (guild.icon) { %>
+                                <img src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" 
+                                     alt="<%= guild.name %>" 
+                                     class="w-16 h-16 rounded-full">
+                            <% } else { %>
+                                <div class="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center">
+                                    <span class="text-2xl font-bold text-gray-600">
+                                        <%= guild.name.charAt(0) %>
+                                    </span>
+                                </div>
+                            <% } %>
+                            <div class="ml-4">
+                                <h3 class="text-xl font-bold"><%= guild.name %></h3>
+                                <p class="text-gray-600">ID: <%= guild.id %></p>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <button class="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+                                Configurar Servidor
+                            </button>
+                            <button class="w-full px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+                                Ver Estadísticas
+                            </button>
+                            <button class="w-full px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">
+                                Gestionar Comandos
+                            </button>
+                        </div>
+                    </div>
+                <% }); %>
+            <% } else { %>
+                <div class="col-span-3 text-center py-8">
+                    <h2 class="text-2xl font-bold text-gray-700 mb-4">No hay servidores disponibles</h2>
+                    <p class="text-gray-600">
+                        No se encontraron servidores donde tengas permisos de administrador.
+                    </p>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <footer class="mt-8 py-4 bg-gray-200">
+        <div class="container mx-auto text-center text-gray-600">
+            <p>&copy; 2025 Bot Dashboard. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+</body>
+</html>
