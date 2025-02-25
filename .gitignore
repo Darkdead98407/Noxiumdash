@@ -9,11 +9,6 @@ yarn-error.log
 .env.local
 .env.*.local
 
-# Database
-*.sqlite
-*.sqlite3
-sessions.db
-
 # Data directory (contains sensitive bot settings)
 src/data/*.json
 
