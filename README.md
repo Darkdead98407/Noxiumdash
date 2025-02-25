@@ -16,14 +16,22 @@ Este es un bot de Discord que puede funcionar en múltiples servidores.
 4. Copia las credenciales:
    - ID DE APLICACIÓN (será tu clientId)
    - TOKEN DEL BOT (será tu token)
+   - CLIENT SECRET (será tu clientSecret)
 
 5. Configura el archivo `config.json`:
 ```json
 {
     "token": "TU_TOKEN_AQUÍ",
-    "clientId": "TU_CLIENT_ID_AQUÍ"
+    "clientId": "TU_CLIENT_ID_AQUÍ",
+    "clientSecret": "TU_CLIENT_SECRET_AQUÍ"
 }
 ```
+
+⚠️ IMPORTANTE: Nunca subas tu token real a GitHub. El token es como una contraseña y debe mantenerse seguro.
+Puedes usar variables de ambiente para mayor seguridad:
+- DISCORD_BOT_TOKEN
+- BOT_CLIENT_ID
+- DISCORD_CLIENT_SECRET
 
 ## Sincronización con VSCode Local
 
@@ -55,15 +63,23 @@ Para mantener sincronizado:
 
 - `/ping` - Muestra la latencia del bot
 - `/servidor` - Muestra información sobre el servidor actual
+- `/nivel` - Muestra tu nivel y experiencia actual
+- `/avatar` - Muestra el avatar de un usuario
+- `/borrar` - Borra mensajes del canal (requiere permisos)
+- `/purgar` - Purga todos los mensajes del canal (requiere permisos)
+- `/setup-nivel` - Configura el canal para notificaciones de nivel
 
 ## Estructura del Proyecto
 
 ```
 src/
 ├── commands/         # Comandos del bot
+│   ├── admin/       # Comandos administrativos
 │   └── utility/     # Comandos de utilidad
-├── deploy-commands.js    # Script para registrar comandos
-├── unregister-commands.js # Script para eliminar comandos
+├── events/          # Eventos del bot
+├── utils/           # Utilidades y herramientas
+├── data/           # Almacenamiento JSON
+├── dashboard/       # Panel de control web
 └── index.js         # Archivo principal del bot
 ```
 
