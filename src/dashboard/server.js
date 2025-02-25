@@ -4,7 +4,7 @@ const passport = require('passport');
 const { Strategy } = require('passport-discord');
 const path = require('path');
 const config = require('../../config.json');
-const { sessionStorage } = require('../utils/jsonStorage');
+const { sessionStore } = require('../utils/jsonStorage');
 
 // Configuración de Passport Discord
 passport.serializeUser((user, done) => done(null, user));
@@ -12,9 +12,13 @@ passport.deserializeUser((user, done) => done(null, user));
 
 const BASE_URL = 'https://fbad2891-5a9d-421d-91d4-7e74da25f5d7-00-3hllxemm25m5u.kirk.replit.dev';
 
+// Usar variables de ambiente primero, luego config como respaldo
+const clientId = process.env.BOT_CLIENT_ID || config.clientId;
+const clientSecret = process.env.DISCORD_CLIENT_SECRET || config.clientSecret;
+
 const strategy = new Strategy({
-    clientID: config.clientId,
-    clientSecret: config.clientSecret,
+    clientID: clientId,
+    clientSecret: clientSecret,
     callbackURL: `${BASE_URL}/auth/discord/callback`,
     scope: ['identify', 'guilds']
 }, (accessToken, refreshToken, profile, done) => {
@@ -30,43 +34,15 @@ const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Store personalizado para sesiones en archivo JSON
-const JsonStore = {
-    get: async function(sid, callback) {
-        try {
-            const session = await sessionStorage.getSession(sid);
-            callback(null, session);
-        } catch (err) {
-            callback(err);
-        }
-    },
-    set: async function(sid, session, callback) {
-        try {
-            await sessionStorage.setSession(sid, session);
-            callback();
-        } catch (err) {
-            callback(err);
-        }
-    },
-    destroy: async function(sid, callback) {
-        try {
-            await sessionStorage.deleteSession(sid);
-            callback();
-        } catch (err) {
-            callback(err);
-        }
-    }
-};
-
 // Configuración de sesiones
 app.use(session({
-    secret: config.clientSecret,
+    secret: clientSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
         maxAge: 60000 * 60 * 24 // 24 horas
     },
-    store: JsonStore
+    store: sessionStore
 }));
 
 app.use(passport.initialize());

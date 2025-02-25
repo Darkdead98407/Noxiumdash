@@ -1,9 +1,9 @@
 const fs = require('fs').promises;
 const path = require('path');
+const session = require('express-session');
 
 // Asegurar que el directorio data existe
 const dataDir = path.join(__dirname, '..', 'data');
-fs.mkdir(dataDir, { recursive: true }).catch(console.error);
 
 // Rutas de los archivos JSON
 const FILES = {
@@ -12,6 +12,29 @@ const FILES = {
     SESSIONS: path.join(dataDir, 'sessions.json')
 };
 
+// Función auxiliar para inicializar archivos JSON
+async function initializeJsonFiles() {
+    try {
+        // Crear directorio si no existe
+        await fs.mkdir(dataDir, { recursive: true });
+
+        // Inicializar cada archivo con un objeto vacío si no existe
+        for (const filePath of Object.values(FILES)) {
+            try {
+                await fs.access(filePath);
+            } catch (error) {
+                if (error.code === 'ENOENT') {
+                    await fs.writeFile(filePath, '{}', 'utf8');
+                    console.log(`✅ Archivo JSON inicializado: ${filePath}`);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error inicializando archivos JSON:', error);
+        throw error;
+    }
+}
+
 // Función auxiliar para leer un archivo JSON
 async function readJsonFile(filePath) {
     try {
@@ -19,8 +42,7 @@ async function readJsonFile(filePath) {
         return JSON.parse(data);
     } catch (error) {
         if (error.code === 'ENOENT') {
-            // Si el archivo no existe, crear uno vacío
-            await writeJsonFile(filePath, {});
+            await fs.writeFile(filePath, '{}', 'utf8');
             return {};
         }
         throw error;
@@ -62,31 +84,79 @@ const levelStorage = {
     }
 };
 
-// Gestión de sesiones
-const sessionStorage = {
-    async getAllSessions() {
-        return await readJsonFile(FILES.SESSIONS);
-    },
-
-    async getSession(sessionId) {
-        const sessions = await this.getAllSessions();
-        return sessions[sessionId];
-    },
-
-    async setSession(sessionId, session) {
-        const sessions = await this.getAllSessions();
-        sessions[sessionId] = session;
-        await writeJsonFile(FILES.SESSIONS, sessions);
-    },
-
-    async deleteSession(sessionId) {
-        const sessions = await this.getAllSessions();
-        delete sessions[sessionId];
-        await writeJsonFile(FILES.SESSIONS, sessions);
+// Crear una clase Store personalizada que extienda de session.Store
+class JsonFileStore extends session.Store {
+    constructor() {
+        super();
+        // Inicializar archivos JSON al crear la instancia
+        initializeJsonFiles().catch(console.error);
     }
-};
+
+    async get(sid, callback) {
+        try {
+            const sessions = await readJsonFile(FILES.SESSIONS);
+            const session = sessions[sid];
+            callback(null, session);
+        } catch (err) {
+            callback(err);
+        }
+    }
+
+    async set(sid, session, callback) {
+        try {
+            const sessions = await readJsonFile(FILES.SESSIONS);
+            sessions[sid] = session;
+            await writeJsonFile(FILES.SESSIONS, sessions);
+            callback(null);
+        } catch (err) {
+            callback(err);
+        }
+    }
+
+    async destroy(sid, callback) {
+        try {
+            const sessions = await readJsonFile(FILES.SESSIONS);
+            delete sessions[sid];
+            await writeJsonFile(FILES.SESSIONS, sessions);
+            callback(null);
+        } catch (err) {
+            callback(err);
+        }
+    }
+
+    async all(callback) {
+        try {
+            const sessions = await readJsonFile(FILES.SESSIONS);
+            callback(null, Object.values(sessions));
+        } catch (err) {
+            callback(err);
+        }
+    }
+
+    async length(callback) {
+        try {
+            const sessions = await readJsonFile(FILES.SESSIONS);
+            callback(null, Object.keys(sessions).length);
+        } catch (err) {
+            callback(err);
+        }
+    }
+
+    async clear(callback) {
+        try {
+            await writeJsonFile(FILES.SESSIONS, {});
+            callback(null);
+        } catch (err) {
+            callback(err);
+        }
+    }
+}
+
+// Exportar el store de sesiones como una instancia
+const sessionStore = new JsonFileStore();
 
 module.exports = {
     levelStorage,
-    sessionStorage
+    sessionStore,
+    initializeJsonFiles
 };

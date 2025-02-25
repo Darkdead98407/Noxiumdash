@@ -4,14 +4,28 @@ const path = require('path');
 const config = require('../config.json');
 const http = require('http');
 const dashboard = require('./dashboard/server');
+const { initializeJsonFiles } = require('./utils/jsonStorage');
 
 async function initializeBot() {
     try {
+        // Inicializar archivos JSON
+        console.log('📁 Inicializando sistema de almacenamiento...');
+        await initializeJsonFiles();
+        console.log('✅ Sistema de almacenamiento inicializado');
+
         // Verificar configuración
-        console.log('🔍 Verificando configuración...');
-        if (!config.token || !config.clientId) {
-            throw new Error('Token o Client ID no encontrados en config.json');
+        console.log('🔍 Verificando configuración del bot...');
+        // Usar token del ambiente primero, luego del config.json como respaldo
+        const token = process.env.DISCORD_BOT_TOKEN || config.token;
+        const clientId = process.env.BOT_CLIENT_ID || config.clientId;
+
+        if (!token) {
+            throw new Error('Token no encontrado en variables de ambiente ni en config.json');
         }
+        if (!clientId) {
+            throw new Error('Client ID no encontrado en variables de ambiente ni en config.json');
+        }
+        console.log('✅ Configuración verificada');
 
         // Crear cliente de Discord
         const client = new Client({
@@ -28,9 +42,9 @@ async function initializeBot() {
         client.commands = new Collection();
 
         // Cargar comandos
+        console.log('📂 Cargando comandos...');
         const commandsPath = path.join(__dirname, 'commands');
         const commandFolders = await fs.readdir(commandsPath);
-        console.log('📂 Cargando comandos...');
 
         for (const folder of commandFolders) {
             const folderPath = path.join(commandsPath, folder);
@@ -43,25 +57,34 @@ async function initializeBot() {
                 if ('data' in command && 'execute' in command) {
                     client.commands.set(command.data.name, command);
                     console.log(`✅ Comando cargado: ${command.data.name}`);
+                } else {
+                    console.warn(`⚠️ El comando en ${filePath} no tiene las propiedades requeridas`);
                 }
             }
         }
 
         // Cargar eventos
+        console.log('📂 Cargando eventos...');
         const eventsPath = path.join(__dirname, 'events');
         const eventFiles = (await fs.readdir(eventsPath)).filter(file => file.endsWith('.js'));
-        console.log('📂 Cargando eventos...');
 
         for (const file of eventFiles) {
             const filePath = path.join(eventsPath, file);
             const event = require(filePath);
 
-            if (event.once) {
-                client.once(event.name, (...args) => event.execute(...args));
-            } else {
-                client.on(event.name, (...args) => event.execute(...args));
+            if (file === 'monitor.js') {
+                if (event.ready) {
+                    client.once(event.ready.name, (...args) => event.ready.execute(client, ...args));
+                    console.log(`✅ Evento monitor.ready cargado`);
+                }
+                if (event.interactionCreate) {
+                    client.on(event.interactionCreate.name, (...args) => event.interactionCreate.execute(...args));
+                    console.log(`✅ Evento monitor.interactionCreate cargado`);
+                }
+            } else if (file === 'levelSystem.js') {
+                client.on('messageCreate', (...args) => event.execute(...args, client));
+                console.log(`✅ Evento levelSystem cargado`);
             }
-            console.log(`✅ Evento cargado: ${event.name}`);
         }
 
         // Manejar comandos slash
@@ -74,16 +97,21 @@ async function initializeBot() {
             try {
                 await command.execute(interaction);
             } catch (error) {
-                console.error(error);
-                await interaction.reply({
-                    content: '¡Hubo un error al ejecutar este comando!',
-                    ephemeral: true
-                });
+                console.error('❌ Error ejecutando comando:', error);
+                const errorMessage = error.message || '¡Hubo un error al ejecutar este comando!';
+
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({
+                        content: `❌ Error: ${errorMessage}`,
+                        ephemeral: true
+                    });
+                }
             }
         });
 
         // Iniciar el bot
-        await client.login(config.token);
+        console.log('🔄 Iniciando sesión del bot...');
+        await client.login(token);
         console.log('✅ Bot conectado exitosamente');
 
         return client;
@@ -96,14 +124,9 @@ async function initializeBot() {
 async function initializeDashboard(client) {
     try {
         console.log('🌐 Iniciando servidor del dashboard...');
-
-        // Hacer el cliente disponible globalmente
         global.discordClient = client;
-
-        // Crear servidor HTTP
         const server = http.createServer(dashboard);
 
-        // Iniciar el servidor
         await new Promise((resolve, reject) => {
             server.listen(5000, '0.0.0.0', () => {
                 console.log('✅ Dashboard iniciado en puerto 5000');
@@ -126,10 +149,8 @@ async function initializeDashboard(client) {
 async function startApplication() {
     try {
         console.log('🚀 Iniciando aplicación...');
-
         const client = await initializeBot();
         await initializeDashboard(client);
-
         console.log('✅ Aplicación iniciada completamente');
     } catch (error) {
         console.error('❌ Error fatal al iniciar la aplicación:', error);
@@ -137,5 +158,4 @@ async function startApplication() {
     }
 }
 
-// Iniciar la aplicación
 startApplication();
